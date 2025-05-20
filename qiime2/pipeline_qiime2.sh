@@ -1,11 +1,11 @@
 [TOC]
 
-# QIIME2 2024.10分析流程
+# QIIME2 2025.4分析流程
 
 ## 0. 软件安装(附录1)
 
     # 在Linux、Mac、Windows内置Linux子系统(支持右键粘贴)下安装并运行
-    # 详细教程参阅官网 https://docs.qiime2.org/2024.10/
+    # 详细教程参阅官网 https://docs.qiime2.org/2025.4/
     # 安装Windows子系统，https://mp.weixin.qq.com/s/0PfA0bqdvrEbo62zPVq4kQ
 
 ## 1. 准备工作
@@ -16,7 +16,7 @@
     mkdir -p ${wd}
     cd ${wd}
     # 激活QIIME2工作环境，旧版conda使用source替换conda运行
-    conda activate qiime2-amplicon-2024.10
+    conda activate qiime2-amplicon-2025.4
     
     # 准备样本元数据metadata.txt、原始数据seq/*.fq.gz
     
@@ -148,10 +148,31 @@
 
 
 ## 4. 物种组成分析
-
-    # 物种注释，数据库见附录，可选silva-138-99-nb-classifier.qza
+    # 训练分类器———全长（通用）
+    ## 下载参考序列和物种分类信息
+    wget -c --no-check-certificate https://ftp.microbio.me/greengenes_release/2022.10/2022.10.backbone.full-length.fna.qza
+    wget -c --no-check-certificate https://ftp.microbio.me/greengenes_release/2022.10/2022.10.backbone.tax.qza
+    ## 全长通用分类器训练，耗时2小时左右
+    time qiime feature-classifier fit-classifier-naive-bayes \
+      --i-reference-reads 2022.10.backbone.full-length.fna.qza \
+      --i-reference-taxonomy 2022.10.backbone.tax.qza \
+      --o-classifier classifier-full.qza
+    # 训练分类器—指定V区分类器
+    ## 使用与测试数据对应的V5 (799F) - V7 (1193R) 引物为例进行提取序列，耗时约6分钟
+    time qiime feature-classifier extract-reads \
+      --i-sequences 2022.10.backbone.full-length.fna.qza \
+      --p-f-primer AACMGGATTAGATACCCKG \
+      --p-r-primer ACGTCATCCCCACCTTCC \
+      --p-trunc-len 350 \
+      --o-reads ref-seqs.qza 
+    ## 基于筛选的指定区段，生成实验特异的分类器，耗时约30分钟
+    time qiime feature-classifier fit-classifier-naive-bayes \
+      --i-reference-reads ref-seqs.qza \
+      --i-reference-taxonomy 2022.10.backbone.tax.qza \
+      --o-classifier classifier_greengenes_V5-V7.qza
+    # 物种注释
     time qiime feature-classifier classify-sklearn \
-      --i-classifier gg_2022_10_backbone_full_length.nb.qza \
+      --i-classifier classifier_greengenes_V5-V7.qza \
       --i-reads rep-seqs.qza \
       --o-classification taxonomy.qza
     # 可视化物种注释
@@ -206,7 +227,7 @@
     mkdir -p $wd
     cd $wd
     
-## 1. qiime2 2024.10安装
+## 1. qiime2 2025.4安装
 
 ### 安装Conda
 
@@ -219,19 +240,17 @@
 ### 方法1. Conda在线安装QIIME
 
     # 附软件在线安装和打包代码
-    n=qiime2-amplicon-2024.10
+    n=qiime2-amplicon-2025.4
     # 下载软件列表
-    wget -c http://www.imeta.science/db/conda/${n}-py310-linux-conda.yml
-    # 备用链接
-    wget -c https://data.qiime2.org/distro/amplicon/${n}-py310-linux-conda.yml
+    wget -c http://www.imeta.science/db/qiime2/qiime2-amplicon-ubuntu-latest-conda.yml
     # 新环境安装，可在不同电脑服务器上安装成功后打包分发
-    conda env create -n ${n} --file ${n}-py310-linux-conda.yml
+    conda env create -n ${n} --file qiime2-amplicon-ubuntu-latest-conda.yml
     # 环境打包(可选，1.2G)
     conda pack -n ${n} -o ${n}.tar.gz
 
 ### 方法2. 本地安装QIIME
 
-    n=qiime2-amplicon-2024.10
+    n=qiime2-amplicon-2025.4
     # 安装包下载链接 
     wget -c ftp://download.nmdc.cn/tools/conda/${n}.tar.gz
     # 新环境安装

@@ -484,37 +484,6 @@
      --p-p-val-approx asymptotic \
      --o-stats jaccard-raincloud-stats.qza \
      --o-raincloud-plot jaccard-raincloud-plot.qzv
-
-## 2. 物种注释数据训练集
-
-### Greengenes2 2022.10 full length sequences
-
-    wget -c http://ftp.microbio.me/greengenes_release/2022.10/2022.10.backbone.full-length.fna.qza
-    wget -c http://ftp.microbio.me/greengenes_release/2022.10/2022.10.backbone.tax.qza
-    # 分类器训练，耗时3小时多
-    time qiime feature-classifier fit-classifier-naive-bayes \
-      --i-reference-reads 2022.10.backbone.full-length.fna.qza \
-      --i-reference-taxonomy 2022.10.backbone.tax.qza \
-      --o-classifier classifier-gg22-full.qza 
-    # 使用与测试数据对应的V5 (799F) - V7 (1193R) 引物
-    time qiime feature-classifier extract-reads \
-      --i-sequences 2022.10.backbone.full-length.fna.qza \
-      --p-f-primer AACMGGATTAGATACCCKG \
-      --p-r-primer ACGTCATCCCCACCTTCC \
-      --p-trunc-len 350 \
-      --o-reads ref-seqs.qza
-    time qiime feature-classifier fit-classifier-naive-bayes \
-      --i-reference-reads ref-seqs.qza \
-      --i-reference-taxonomy 2022.10.backbone.tax.qza \
-      --o-classifier classifier_gg22_V5-V7.qza
-
-    # 国内高速备份链接
-    wget -c ftp://download.nmdc.cn/tools/amplicon/GreenGenes/2022.10.backbone.full-length.nb.qza
-    # QIIME或Greengene官网下载(国外较慢)
-    wget -c https://data.qiime2.org/classifiers/greengenes/gg_2022_10_backbone_full_length.nb.qza
-    wget -c http://ftp.microbio.me/greengenes_release/2022.10/2022.10.backbone.full-length.nb.qza
-    # 统一文件名
-    mv 2022.10.backbone.full-length.nb.qza gg_2022_10_backbone_full_length.nb.qza 
     
 ### Silva 138 99% OTUs full-length sequences
 
@@ -522,7 +491,7 @@
     wget -c https://data.qiime2.org/2024.10/common/silva-138-99-seqs.qza
     wget -c https://data.qiime2.org/2024.10/common/silva-138-99-tax.qza
 
-## 3. 物种注释数据训练集(gg13为例，可选)
+## 物种注释数据训练集(gg13为例，可选)
 
     # 下载数据库文件(greengenes, 320M)
     # wget -c ftp://greengenes.microbio.me/greengenes_release/gg_13_5/gg_13_8_otus.tar.gz

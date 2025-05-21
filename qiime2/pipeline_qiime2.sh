@@ -152,11 +152,13 @@
     ## 下载参考序列和物种分类信息
     wget -c --no-check-certificate https://ftp.microbio.me/greengenes_release/2022.10/2022.10.backbone.full-length.fna.qza
     wget -c --no-check-certificate https://ftp.microbio.me/greengenes_release/2022.10/2022.10.backbone.tax.qza
+    
     ## 全长通用分类器训练，耗时2小时左右
     time qiime feature-classifier fit-classifier-naive-bayes \
       --i-reference-reads 2022.10.backbone.full-length.fna.qza \
       --i-reference-taxonomy 2022.10.backbone.tax.qza \
       --o-classifier classifier-full.qza
+    
     # 训练分类器—指定V区分类器
     ## 使用与测试数据对应的V5 (799F) - V7 (1193R) 引物为例进行提取序列，耗时约6分钟
     time qiime feature-classifier extract-reads \
@@ -165,20 +167,24 @@
       --p-r-primer ACGTCATCCCCACCTTCC \
       --p-trunc-len 350 \
       --o-reads ref-seqs.qza 
+    
     ## 基于筛选的指定区段，生成实验特异的分类器，耗时约30分钟
     time qiime feature-classifier fit-classifier-naive-bayes \
       --i-reference-reads ref-seqs.qza \
       --i-reference-taxonomy 2022.10.backbone.tax.qza \
       --o-classifier classifier_greengenes_V5-V7.qza
+    
     # 物种注释
     time qiime feature-classifier classify-sklearn \
       --i-classifier classifier_greengenes_V5-V7.qza \
       --i-reads rep-seqs.qza \
       --o-classification taxonomy.qza
+    
     # 可视化物种注释
     qiime metadata tabulate \
       --m-input-file taxonomy.qza \
       --o-visualization taxonomy.qzv
+    
     # 堆叠柱状图展示
     qiime taxa barplot \
       --i-table table.qza \
@@ -259,6 +265,225 @@
     # 激活并初始化环境
     conda activate ${n}
     conda unpack
+
+## q2-picrust2插件教程（功能预测）
+
+### 1.安装
+     # 创建学习目录
+     mkdir -p q2-picrust2-tutorial
+     cd q2-picrust2-tutorial
+     
+     # 使用conda安装q2-picrust2（原始链接）
+     conda env create --name q2-picrust2-amplicon-2024.5 --file \
+     https://raw.githubusercontent.com/picrust/q2-picrust2/refs/heads/master/environment-files/q2-picrust2-qiime2-amplicon-2024.5.yml
+
+     # 备用链接
+     wget -c http://www.imeta.science/db/qiime2/q2-picrust2-amplicon-2024.5.yml
+     conda env create --name q2-picrust2-amplicon-2024.5 --file q2-picrust2-amplicon-2024.5.yml
+
+     # 激活环境
+     conda activate q2-picrust2-amplicon-2024.5
+     
+### 2.下载PICRUSt2 教程中的测试文件
+     wget -c http://kronos.pharmacology.dal.ca/public_files/picrust/picrust2_tutorial_files/mammal_biom.qza
+     wget -c http://kronos.pharmacology.dal.ca/public_files/picrust/picrust2_tutorial_files/mammal_seqs.qza
+     wget -c http://kronos.pharmacology.dal.ca/public_files/picrust/picrust2_tutorial_files/mammal_metadata.tsv
+     
+### 3.功能预测
+   # 创建临时目录并设置环境变量
+   mkdir -p ~/tmp/qiime2_picrust2_temp
+   export TMPDIR=~/tmp/qiime2_picrust2_temp
+   
+   # 运行SEPP
+   qiime picrust2 full-pipeline \
+     --i-table mammal_biom.qza \
+     --i-seq mammal_seqs.qza \
+     --output-dir q2-picrust2_output \
+     --p-placement-tool sepp \
+     --p-threads 8 \
+     --p-hsp-method pic \
+     --p-max-nsti 2 \
+     --verbose 
+    # 输出结果文件有ec_metagenome.qza-EC 宏基因组预测、ko_metagenome.qza-KO宏基因组预测和pathway_abundance.qza-MetaCyc通路丰度预测
+    
+###  4.获取有关通路丰度文件的摘要信息
+     qiime feature-table summarize \
+       --i-table q2-picrust2_output/pathway_abundance.qza \
+       --o-visualization q2-picrust2_output/pathway_abundance.qzv
+
+### 5.计算多样性指标
+    qiime diversity core-metrics \
+      --i-table q2-picrust2_output/pathway_abundance.qza \
+      --p-sampling-depth 236867 \
+      --m-metadata-file mammal_metadata.tsv \
+      --output-dir pathabun_core_metrics_out \
+      --p-n-jobs 1
+      
+## q2-ITSxpress插件教程（修剪 ITS 序列的保守侧翼区域）
+### 1.安装
+    # 创建目录
+    mkdir -p q2-ITSxpress-tutorial
+    cd q2-ITSxpress-tutorial
+    
+    # 激活QIIME 2环境
+    conda activate qiime2-amplicon-2025.4
+    
+    # 使用 Bioconda 安装 ITSxpress
+    conda install -c bioconda itsxpress
+   
+    # 刷新插件
+    qiime dev refresh-cache
+  
+    # 检查是否安装成功
+    qiime itsxpress
+
+### 2.下载示例数据
+    wget -c http://www.imeta.science/db/qiime2/sample1_r1.fastq.gz
+    wget -c http://www.imeta.science/db/qiime2/sample1_r2.fastq.gz
+    wget -c http://www.imeta.science/db/qiime2/sample2_r1.fastq.gz
+    wget -c http://www.imeta.science/db/qiime2/sample2_r2.fastq.gz
+    wget -c http://www.imeta.science/db/qiime2/manifest.txt
+    wget -c http://www.imeta.science/db/qiime2/mapping.txt
+
+### 3.导入序列数据
+    qiime tools import \
+      --type SampleData[PairedEndSequencesWithQuality] \
+      --input-format PairedEndFastqManifestPhred33\
+      --input-path manifest.txt \
+      --output-path sequences.qza
+      
+    # 通过运行 summarize 命令来查看数据的质量
+    qiime demux summarize \
+      --i-data sequences.qza \
+      --o-visualization sequences.qzv
+      
+### 4.使用 ITSxpress 修剪 ITS 样本
+    qiime itsxpress trim-pair-output-unmerged\
+      --i-per-sample-sequences sequences.qza \
+      --p-region ITS2 \
+      --p-taxa F \
+      --p-cluster-id 1.0 \
+      --p-threads 16 \
+      --o-trimmed trimmed_exact.qza
+      
+     # 使用以下命令聚类 99.5% 的序列相似度
+      qiime itsxpress trim-pair-output-unmerged \
+        --i-per-sample-sequences sequences.qza \
+        --p-region ITS2 \
+        --p-taxa F \
+        --p-cluster-id 0.995 \
+        --p-threads 16 \
+        --o-trimmed trimmed.qza
+
+### 5.使用 DADA2 识别序列变异
+    qiime dada2 denoise-paired \
+      --i-demultiplexed-seqs trimmed_exact.qza \
+      --p-trunc-len-r 0 \
+      --p-trunc-len-f 0 \
+      --output-dir dada2out
+      
+     # 汇总数据以进行目视检查
+      qiime feature-table summarize \
+        --i-table dada2out/table.qza \
+        --o-visualization tableviz.qzv
+### 6.从UNITE下载用于真菌分类的参考数据
+    # 原始下载链接
+    wget -c https://s3.hpc.ut.ee/plutof-public/original/db1d6ddb-a35d-48c5-8b1a-ad9dd3310c6d.tgz
+    
+    # 备用下载链接
+    wget -c http://www.imeta.science/db/qiime2/db1d6ddb-a35d-48c5-8b1a-ad9dd3310c6d.tgz
+    
+    # 解压
+    tar -xzvf db1d6ddb-a35d-48c5-8b1a-ad9dd3310c6d.tgz
+    
+    # 将最新的UNITE数据导入QIIME 2
+    qiime tools import \
+      --type 'FeatureData[Sequence]' \
+      --input-path sh_refs_qiime_ver10_dynamic_04.04.2024.fasta \
+      --output-path unite.qza
+
+    qiime tools import \
+      --type 'FeatureData[Taxonomy]' \
+      --input-format HeaderlessTSVTaxonomyFormat \
+      --input-path sh_taxonomy_qiime_ver10_dynamic_04.04.2024.txt \
+      --output-path unite-taxonomy.qza
+    
+### 7.训练QIIME 2分类器，耗时1小时左右
+    qiime feature-classifier fit-classifier-naive-bayes \
+      --i-reference-reads unite.qza \
+      --i-reference-taxonomy unite-taxonomy.qza \
+      --o-classifier classifier.qza
+      
+### 8.对序列变体进行分类
+    qiime feature-classifier classify-sklearn \
+      --i-classifier classifier.qza \
+      --i-reads dada2out/representative_sequences.qza \
+      --o-classification taxonomy.qza
+
+   # 汇总结果
+    qiime metadata tabulate \
+      --m-input-file taxonomy.qza \
+      --o-visualization taxonomy.qzv
+      
+   # 堆叠柱状图展示
+    qiime taxa barplot \
+      --i-table dada2out/table.qza  \
+      --i-taxonomy taxonomy.qza \
+      --m-metadata-file mapping.txt \
+      --o-visualization taxa-bar-plots.qzv
+
+## q2-FMT插件教程（评估粪菌移植后的植入范围）
+### 1.安装
+    # 下载清单文件（原始链接）
+    wget -c https://raw.githubusercontent.com/qiime2/q2-fmt/refs/heads/dev/environment-files/q2-fmt-qiime2-amplicon-2024.10.yml
+
+    # 备用链接
+    wget -c http://www.imeta.science/db/qiime2/q2-fmt-qiime2-amplicon-2024.10.yml
+
+    # conda新建环境安装
+    conda env create --name q2-fmt-amplicon-2024.10 --file q2-fmt-qiime2-amplicon-2024.10.yml
+
+    # 安装过程中遇到提示pip 安装一个依赖项无法从 GitHub 下载 q2-fmt 的压缩包时，手动下载从本地安装
+    wget -c http://www.imeta.science/db/qiime2/q2-fmt-2024.11.1.zip
+    ~/miniconda3/envs/q2-fmt-amplicon-2024.10/bin/python -m pip install ./q2-fmt-2024.11.1.zip
+
+### 2.下载元数据和特征表
+    # 创建目录并进入
+    mkdir q2-fmt-tutorial
+    cd q2-fmt-tutorial
+
+    # 数据下载
+    wget -O 'sample-metadata.tsv' \
+    'https://q2-fmt.readthedocs.io/en/latest/data/tutorial/sample-metadata.tsv'
+    wget -O 'feature-table.qza' \
+   'https://q2-fmt.readthedocs.io/en/latest/data/tutorial/feature-table.qza'
+
+    # 汇总特征表
+    qiime feature-table summarize \
+      --i-table feature-table.qza \
+      --m-sample-metadata-file sample-metadata.tsv \
+      --o-visualization autofmt-table-summ.qzv
+### 3.计算多样性指标
+   qiime diversity core-metrics \
+     --i-table feature-table.qza \
+     --p-sampling-depth 10000 \
+     --m-metadata-file sample-metadata.tsv \
+     --output-dir diversity-core-metrics
+
+### 4.绘制云雨图了解受体与供体的距离
+   qiime fmt cc \
+     --i-diversity-measure diversity-core-metrics/jaccard_distance_matrix.qza \
+     --m-metadata-file sample-metadata.tsv \
+     --p-distance-to donor \
+     --p-compare baseline \
+     --p-time-column timepoints \
+     --p-reference-column DonorSampleID \
+     --p-subject-column PatientID \
+     --p-filter-missing-references \
+     --p-against-group 0 \
+     --p-p-val-approx asymptotic \
+     --o-stats jaccard-raincloud-stats.qza \
+     --o-raincloud-plot jaccard-raincloud-plot.qzv
 
 ## 2. 物种注释数据训练集
 
